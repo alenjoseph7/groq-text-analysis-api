@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h2>Test AWS LLM API</h2>
+
+<textarea id="inputText" rows="6" cols="50">
+Enter text here...
+</textarea><br><br>
+
+<button onclick="sendRequest()">Send Request</button>
+
+<pre id="output"></pre>
+
+<script>
+function sendRequest() {
+    const text = document.getElementById("inputText").value;
+
+    fetch("https://3eeentkcq3.execute-api.ap-southeast-2.amazonaws.com/prod/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text })
+    })
+    .then(response => response.text())
+    .then(data => {
+        document.getElementById("output").textContent = data;
+    })
+    .catch(error => {
+        document.getElementById("output").textContent = error;
+    });
+}
+</script>
+
+</body>
+</html>
