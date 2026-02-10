@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Groq Text Analysis Dashboard</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg: #0f1117;
+            --surface: #1a1d27;
+            --surface-2: #232733;
+            --border: #2e3347;
+            --text: #e4e6f0;
+            --text-dim: #8b8fa3;
+            --accent: #6c63ff;
+            --accent-glow: rgba(108, 99, 255, 0.15);
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #eab308;
+            --blue: #3b82f6;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header h1 span { color: var(--accent); }
+
+        .status-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            color: var(--green);
+            background: rgba(34, 197, 94, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 24px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        .card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+        }
+
+        .card-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+
+        .input-card { grid-column: 1; }
+        .result-card { grid-column: 2; grid-row: 1 / 3; }
+        .history-card { grid-column: 1 / 3; }
+
+        textarea {
+            width: 100%;
+            min-height: 160px;
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 14px;
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus { border-color: var(--accent); }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .mode-select {
+            background: var(--surface-2);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: var(--text);
+            font-size: 14px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        .mode-select:focus { border-color: var(--accent); }
+
+        .btn {
+            padding: 10px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover { filter: brightness(1.15); }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background: var(--surface-2);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover { background: var(--border); }
+
+        .char-count {
+            margin-left: auto;
+            font-size: 12px;
+            color: var(--text-dim);
+        }
+
+        /* Results */
+        .result-loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-dim);
+        }
+
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 12px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .result-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 200px;
+            color: var(--text-dim);
+            font-size: 14px;
+        }
+
+        .result-grid {
+            display: grid;
+            gap: 12px;
+        }
+
+        .result-item {
+            background: var(--surface-2);
+            border-radius: 8px;
+            padding: 12px 16px;
+        }
+
+        .result-label {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+        }
+
+        .result-value {
+            font-size: 15px;
+            color: var(--text);
+            line-height: 1.5;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .tag-positive { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+        .tag-negative { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+        .tag-neutral { background: rgba(59, 130, 246, 0.15); color: var(--blue); }
+        .tag-low { background: rgba(34, 197, 94, 0.15); color: var(--green); }
+        .tag-moderate { background: rgba(234, 179, 8, 0.15); color: var(--yellow); }
+        .tag-high { background: rgba(239, 68, 68, 0.15); color: var(--red); }
+
+        .entity-tag {
+            display: inline-block;
+            padding: 3px 8px;
+            margin: 2px;
+            border-radius: 6px;
+            font-size: 12px;
+            background: var(--accent-glow);
+            color: var(--accent);
+            border: 1px solid rgba(108, 99, 255, 0.3);
+        }
+
+        .metadata {
+            display: flex;
+            gap: 16px;
+            margin-top: 16px;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+            font-size: 12px;
+            color: var(--text-dim);
+            flex-wrap: wrap;
+        }
+
+        .metadata span { display: flex; align-items: center; gap: 4px; }
+
+        /* History */
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+
+        .history-table th {
+            text-align: left;
+            padding: 10px 12px;
+            color: var(--text-dim);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .history-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            color: var(--text);
+        }
+
+        .history-table tr:last-child td { border-bottom: none; }
+        .history-table tr:hover td { background: var(--surface-2); }
+
+        .empty-history {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dim);
+        }
+
+        /* Confidence Bar */
+        .confidence-bar {
+            height: 6px;
+            background: var(--surface);
+            border-radius: 3px;
+            margin-top: 6px;
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: var(--accent);
+            transition: width 0.5s ease;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+            .input-card, .result-card, .history-card {
+                grid-column: 1;
+                grid-row: auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>⚡ <span>Groq</span> Text Analysis</h1>
+        <div class="status-badge" id="statusBadge">
+            <div class="status-dot"></div>
+            API Connected
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- Input Card -->
+        <div class="card input-card">
+            <div class="card-title">Input Text</div>
+            <textarea id="inputText" placeholder="Paste or type your text here for analysis..."></textarea>
+            <div class="controls">
+                <select class="mode-select" id="modeSelect">
+                    <option value="quick">⚡ Quick Analysis</option>
+                    <option value="detailed">🔍 Detailed Analysis</option>
+                    <option value="entities">🏷️ Entity Extraction</option>
+                    <option value="sentiment">💭 Sentiment Deep Dive</option>
+                </select>
+                <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">Analyze</button>
+                <button class="btn btn-secondary" onclick="clearAll()">Clear</button>
+                <span class="char-count" id="charCount">0 / 8,000</span>
+            </div>
+
+            <!-- Batch Input -->
+            <div style="margin-top: 16px;">
+                <div class="card-title" style="font-size: 12px; margin-bottom: 8px;">Batch Mode</div>
+                <textarea id="batchText" placeholder="Enter multiple texts, one per line..." style="min-height: 80px; font-size: 13px;"></textarea>
+                <button class="btn btn-secondary" style="margin-top: 8px;" onclick="analyzeBatch()">Analyze Batch</button>
+            </div>
+        </div>
+
+        <!-- Results Card -->
+        <div class="card result-card">
+            <div class="card-title">Analysis Results</div>
+            <div id="resultArea">
+                <div class="result-empty">Enter text and click Analyze to see results</div>
+            </div>
+        </div>
+
+        <!-- History Card -->
+        <div class="card history-card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div class="card-title" style="margin: 0;">Recent Analysis History</div>
+                <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="loadHistory()">Refresh</button>
+            </div>
+            <div id="historyArea">
+                <div class="empty-history">No analysis history yet</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── Configuration ──
+        const API_URL = "https://u8ya1qt0h2.execute-api.us-east-1.amazonaws.com/prod/analyze";  // Replace with your actual API Gateway URL
+
+        // ── Character Counter ──
+        document.getElementById("inputText").addEventListener("input", function() {
+            const count = this.value.length;
+            document.getElementById("charCount").textContent = `${count.toLocaleString()} / 8,000`;
+            document.getElementById("charCount").style.color = count > 8000 ? "#ef4444" : "#8b8fa3";
+        });
+
+        // ── Single Analysis ──
+        async function analyze() {
+            const text = document.getElementById("inputText").value.trim();
+            const mode = document.getElementById("modeSelect").value;
+            
+            if (!text) {
+                alert("Please enter some text to analyze");
+                return;
+            }
+
+            const btn = document.getElementById("analyzeBtn");
+            btn.disabled = true;
+            btn.textContent = "Analyzing...";
+
+            document.getElementById("resultArea").innerHTML = `
+                <div class="result-loading">
+                    <div class="spinner"></div>
+                    Analyzing with Groq LLM...
+                </div>`;
+
+            try {
+                const res = await fetch(API_URL, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ text, mode })
+                });
+
+                const data = await res.json();
+                
+                // Handle stringified body (API Gateway wraps response)
+                const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+                if (parsed.error) {
+                    showError(parsed.error);
+                } else if (parsed.result) {
+                    showResult(parsed.result, parsed.metadata, mode);
+                    loadHistory();
+                } else {
+                    showResult(parsed, {}, mode);
+                    loadHistory();
+                }
+            } catch (err) {
+                showError(`Request failed: ${err.message}`);
+            }
+
+            btn.disabled = false;
+            btn.textContent = "Analyze";
+        }
+
+        // ── Batch Analysis ──
+        async function analyzeBatch() {
+            const batchText = document.getElementById("batchText").value.trim();
+            if (!batchText) {
+                alert("Please enter texts (one per line) for batch analysis");
+                return;
+            }
+
+            const texts = batchText.split("\n").filter(t => t.trim());
+            const mode = document.getElementById("modeSelect").value;
+
+            document.getElementById("resultArea").innerHTML = `
+                <div class="result-loading">
+                    <div class="spinner"></div>
+                    Analyzing ${texts.length} texts...
+                </div>`;
+
+            try {
+                const res = await fetch(API_URL.replace("/analyze", "/batch"), {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ texts, mode })
+                });
+
+                const data = await res.json();
+                const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+                if (parsed.batch_summary) {
+                    showBatchResult(parsed);
+                    loadHistory();
+                } else if (parsed.error) {
+                    showError(parsed.error);
+                }
+            } catch (err) {
+                showError(`Batch request failed: ${err.message}`);
+            }
+        }
+
+        // ── Display Results ──
+        function showResult(result, metadata = {}, mode = "quick") {
+            let html = '<div class="result-grid">';
+
+            // Summary
+            if (result.summary) {
+                html += `<div class="result-item">
+                    <div class="result-label">Summary</div>
+                    <div class="result-value">${escapeHtml(result.summary)}</div>
+                </div>`;
+            }
+
+            // Sentiment
+            const sentiment = result.sentiment || result.overall_sentiment;
+            if (sentiment) {
+                const sentClass = sentiment.toLowerCase().includes("pos") ? "positive" : 
+                                  sentiment.toLowerCase().includes("neg") ? "negative" : "neutral";
+                const confidence = result.confidence || result.sentiment_confidence;
+                html += `<div class="result-item">
+                    <div class="result-label">Sentiment</div>
+                    <div class="result-value">
+                        <span class="tag tag-${sentClass}">${escapeHtml(sentiment)}</span>
+                        ${confidence ? `<span style="margin-left: 8px; font-size: 13px; color: #8b8fa3">${(confidence * 100).toFixed(0)}% confidence</span>` : ""}
+                    </div>
+                    ${confidence ? `<div class="confidence-bar"><div class="confidence-fill" style="width: ${confidence * 100}%"></div></div>` : ""}
+                </div>`;
+            }
+
+            // Category
+            if (result.category) {
+                html += `<div class="result-item">
+                    <div class="result-label">Category${result.subcategory ? " / Subcategory" : ""}</div>
+                    <div class="result-value">${escapeHtml(result.category)}${result.subcategory ? ` → ${escapeHtml(result.subcategory)}` : ""}</div>
+                </div>`;
+            }
+
+            // Risk Level
+            if (result.risk_level) {
+                const riskClass = result.risk_level.toLowerCase();
+                html += `<div class="result-item">
+                    <div class="result-label">Risk Level</div>
+                    <div class="result-value"><span class="tag tag-${riskClass}">${escapeHtml(result.risk_level)}</span></div>
+                    ${result.risk_factors ? `<div style="margin-top: 6px; font-size: 13px; color: #8b8fa3">${result.risk_factors.map(f => escapeHtml(f)).join(" · ")}</div>` : ""}
+                </div>`;
+            }
+
+            // Emotion Breakdown (sentiment mode)
+            if (result.emotion_breakdown) {
+                html += `<div class="result-item">
+                    <div class="result-label">Emotion Breakdown</div>
+                    <div class="result-value">`;
+                for (const [emotion, score] of Object.entries(result.emotion_breakdown)) {
+                    const pct = (score * 100).toFixed(0);
+                    html += `<div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
+                        <span style="width: 70px; font-size: 13px; text-transform: capitalize;">${emotion}</span>
+                        <div style="flex: 1; height: 6px; background: #232733; border-radius: 3px;">
+                            <div style="width: ${pct}%; height: 100%; background: var(--accent); border-radius: 3px;"></div>
+                        </div>
+                        <span style="font-size: 12px; color: #8b8fa3; width: 35px;">${pct}%</span>
+                    </div>`;
+                }
+                html += `</div></div>`;
+            }
+
+            // Tone & Subjectivity
+            if (result.tone) {
+                html += `<div class="result-item">
+                    <div class="result-label">Tone${result.subjectivity ? " & Subjectivity" : ""}</div>
+                    <div class="result-value" style="text-transform: capitalize;">${escapeHtml(result.tone)}${result.subjectivity ? ` · ${escapeHtml(result.subjectivity)}` : ""}</div>
+                </div>`;
+            }
+
+            // Entities
+            if (result.entities && result.entities.length > 0) {
+                html += `<div class="result-item">
+                    <div class="result-label">Entities (${result.entities.length})</div>
+                    <div class="result-value">`;
+                result.entities.forEach(e => {
+                    html += `<span class="entity-tag">${escapeHtml(e.name)} <span style="opacity:0.6; font-size:10px;">${escapeHtml(e.type)}</span></span> `;
+                });
+                html += `</div></div>`;
+            }
+
+            // Key Phrases
+            const phrases = result.key_phrases || result.key_sentiment_drivers;
+            if (phrases && phrases.length > 0) {
+                html += `<div class="result-item">
+                    <div class="result-label">${result.key_sentiment_drivers ? "Sentiment Drivers" : "Key Phrases"}</div>
+                    <div class="result-value">${phrases.map(p => `<span class="entity-tag" style="background: rgba(59,130,246,0.1); color: var(--blue); border-color: rgba(59,130,246,0.2);">${escapeHtml(p)}</span>`).join(" ")}</div>
+                </div>`;
+            }
+
+            // Actionable Insights
+            if (result.actionable_insights && result.actionable_insights.length > 0) {
+                html += `<div class="result-item">
+                    <div class="result-label">Actionable Insights</div>
+                    <div class="result-value">`;
+                result.actionable_insights.forEach((insight, i) => {
+                    html += `<div style="margin: 4px 0; font-size: 13px;">→ ${escapeHtml(insight)}</div>`;
+                });
+                html += `</div></div>`;
+            }
+
+            html += '</div>';
+
+            // Metadata
+            if (metadata && metadata.processing_time_ms) {
+                html += `<div class="metadata">
+                    <span>⚡ ${metadata.processing_time_ms}ms</span>
+                    <span>📊 ${metadata.tokens_used} tokens</span>
+                    <span>📝 ${metadata.text_length?.toLocaleString()} chars</span>
+                    <span>🤖 ${metadata.model || "llama-3.3-70b"}</span>
+                </div>`;
+            }
+
+            document.getElementById("resultArea").innerHTML = html;
+        }
+
+        function showBatchResult(data) {
+            const summary = data.batch_summary;
+            let html = `<div class="result-item" style="margin-bottom: 12px;">
+                <div class="result-label">Batch Summary</div>
+                <div class="result-value">
+                    ${summary.total} texts analyzed · 
+                    <span style="color: var(--green)">${summary.successful} successful</span> · 
+                    ${summary.failed > 0 ? `<span style="color: var(--red)">${summary.failed} failed</span> · ` : ""}
+                    ${summary.total_processing_time_ms}ms total
+                </div>
+            </div>`;
+
+            html += '<div class="result-grid">';
+            data.results.forEach(r => {
+                if (r.success) {
+                    html += `<div class="result-item">
+                        <div class="result-label">Text ${r.index + 1} (${r.processing_time_ms}ms)</div>
+                        <div class="result-value">
+                            ${r.result.summary ? escapeHtml(r.result.summary) : ""}
+                            ${r.result.sentiment ? ` <span class="tag tag-${r.result.sentiment.toLowerCase().includes('pos') ? 'positive' : r.result.sentiment.toLowerCase().includes('neg') ? 'negative' : 'neutral'}">${escapeHtml(r.result.sentiment)}</span>` : ""}
+                        </div>
+                    </div>`;
+                } else {
+                    html += `<div class="result-item">
+                        <div class="result-label">Text ${r.index + 1}</div>
+                        <div class="result-value" style="color: var(--red);">Error: ${escapeHtml(r.error)}</div>
+                    </div>`;
+                }
+            });
+            html += '</div>';
+
+            document.getElementById("resultArea").innerHTML = html;
+        }
+
+        function showError(message) {
+            document.getElementById("resultArea").innerHTML = `
+                <div class="result-item" style="border: 1px solid rgba(239,68,68,0.3);">
+                    <div class="result-label" style="color: var(--red);">Error</div>
+                    <div class="result-value">${escapeHtml(message)}</div>
+                </div>`;
+        }
+
+        // ── History ──
+        async function loadHistory() {
+            try {
+                const res = await fetch(API_URL.replace("/analyze", "/history"), {
+                    method: "GET",
+                    headers: { "Content-Type": "application/json" }
+                });
+                const data = await res.json();
+                const parsed = typeof data.body === "string" ? JSON.parse(data.body) : data;
+
+                if (parsed.history && parsed.history.length > 0) {
+                    let html = `<table class="history-table">
+                        <tr><th>Time</th><th>Mode</th><th>Preview</th><th>Sentiment</th><th>Speed</th></tr>`;
+
+                    parsed.history.slice(0, 10).forEach(h => {
+                        const sentiment = h.result?.sentiment || h.result?.overall_sentiment || "-";
+                        const sentClass = sentiment.toLowerCase().includes("pos") ? "positive" : 
+                                         sentiment.toLowerCase().includes("neg") ? "negative" : "neutral";
+                        const time = new Date(h.timestamp).toLocaleTimeString();
+
+                        html += `<tr>
+                            <td>${time}</td>
+                            <td><span style="text-transform: capitalize;">${h.mode}</span></td>
+                            <td style="max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${escapeHtml(h.text_preview)}</td>
+                            <td><span class="tag tag-${sentClass}">${escapeHtml(sentiment)}</span></td>
+                            <td>${h.processing_time_ms}ms</td>
+                        </tr>`;
+                    });
+
+                    html += '</table>';
+                    document.getElementById("historyArea").innerHTML = html;
+                }
+            } catch (err) {
+                // Silently fail for history
+                console.log("Could not load history:", err);
+            }
+        }
+
+        // ── Utilities ──
+        function escapeHtml(str) {
+            if (!str) return "";
+            const div = document.createElement("div");
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function clearAll() {
+            document.getElementById("inputText").value = "";
+            document.getElementById("batchText").value = "";
+            document.getElementById("charCount").textContent = "0 / 8,000";
+            document.getElementById("resultArea").innerHTML = '<div class="result-empty">Enter text and click Analyze to see results</div>';
+        }
+
+        // ── Keyboard shortcut ──
+        document.getElementById("inputText").addEventListener("keydown", function(e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+                analyze();
+            }
+        });
+
+        // ── Load history on page load ──
+        loadHistory();
+    </script>
+</body>
+</html>
